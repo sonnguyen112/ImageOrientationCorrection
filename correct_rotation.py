@@ -35,7 +35,7 @@ def process_images(model, input_path, output_path,
         RotNetDataGenerator(
             image_paths,
             input_shape=(224, 224, 3),
-            batch_size=64,
+            batch_size=1,
             one_hot=True,
             preprocess_func=preprocess_input,
             rotate=False,

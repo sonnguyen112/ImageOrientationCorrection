@@ -309,7 +309,7 @@ class RotNetDataGenerator(Sequence):
                 # get a random angle
                 rotation_angle = np.random.choice(rotations)
             else:
-                rotation_angle = 0
+                rotation_angle = 5
 
             # generate the rotated image
             rotated_image = generate_rotated_image(
@@ -329,6 +329,7 @@ class RotNetDataGenerator(Sequence):
 
             # store the image and label in their corresponding batches
             batch_x[i] = rotated_image
+            
             batch_y[i] = rotations.index(rotation_angle)
 
         if self.one_hot:
