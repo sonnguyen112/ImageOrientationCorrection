@@ -180,3 +180,10 @@ SUNRGBD
 *.zip
 models
 rotnet_models
+mit_indoor
+indoor_dataset
+mit_dataset_rotation
+logs
+runs
+scr
+*.pt

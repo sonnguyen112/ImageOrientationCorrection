@@ -4,11 +4,12 @@ import os
 import sys
 
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
-from keras.applications.resnet50 import ResNet50
+from tensorflow.keras.applications import ResNet50
 from keras.applications.imagenet_utils import preprocess_input
 from keras.models import Model
 from keras.layers import Dense, Flatten
 from keras.optimizers import SGD
+import keras.backend as K
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import angle_error, RotNetDataGenerator
@@ -21,10 +22,10 @@ train_filenames, test_filenames = get_street_view_filenames(data_path)
 print(len(train_filenames), 'train samples')
 print(len(test_filenames), 'test samples')
 
-model_name = 'rotnet_street_view_resnet50'
+model_name = 'rotnet_street_view_resnet50_2'
 
 # number of classes
-nb_classes = 360
+nb_classes = 24
 # input image shape
 input_shape = (224, 224, 3)
 
@@ -42,13 +43,17 @@ model = Model(inputs=base_model.input, outputs=final_output)
 
 model.summary()
 
+# def custom_loss(y_true, y_pred):
+#     entropy = K.categorical_crossentropy(y_true, y_pred)
+#     return entropy + angle_error(y_true, y_pred)
+
 # model compilation
-model.compile(loss='categorical_crossentropy',
+model.compile(loss="categorical_crossentropy",
               optimizer=SGD(learning_rate=0.01, momentum=0.9),
               metrics=[angle_error])
 
 # training parameters
-batch_size = 1
+batch_size = 64
 nb_epoch = 50
 
 output_folder = 'models'

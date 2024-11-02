@@ -10,6 +10,8 @@ from keras.models import load_model
 
 from utils import RotNetDataGenerator, crop_largest_rectangle, angle_error, rotate
 
+bound_angle = 15
+
 
 def process_images(model, input_path, output_path,
                    batch_size=64, crop=True):
@@ -40,10 +42,9 @@ def process_images(model, input_path, output_path,
             crop_largest_rect=True,
             crop_center=True
         ),
-        val_samples=len(image_paths)
     )
 
-    predicted_angles = np.argmax(predictions, axis=1)
+    predicted_angles = np.argmax(predictions, axis=1) - bound_angle
 
     if output_path == '':
         output_path = '.'

@@ -4,6 +4,7 @@ import math
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
 
 
 # from keras.preprocessing.image import Iterator
@@ -12,6 +13,7 @@ from keras.utils import to_categorical
 # import keras.backend as K
 import tensorflow as tf
 
+rotations = [i * -5 for i in range(1, 13)] + [i * 5 for i in range(1, 13)]
 
 def angle_difference(x, y):
     """
@@ -26,7 +28,11 @@ def angle_error(y_true, y_pred):
     and the predicted angles. Each angle is represented
     as a binary vector.
     """
-    diff = angle_difference(tf.argmax(y_true), tf.argmax(y_pred))
+    rotations_tf = tf.constant(rotations)
+    y_true_idx = tf.argmax(y_true)
+    y_pred_idx = tf.argmax(y_pred)
+    diff = angle_difference(tf.gather(rotations_tf, y_true_idx), 
+                            tf.gather(rotations_tf, y_pred_idx))
     return tf.reduce_mean(tf.cast(tf.abs(diff), tf.float32))
 
 
@@ -224,6 +230,16 @@ def generate_rotated_image(image, angle, size=None, crop_center=False,
 
     return image
 
+def find_binary_img_by_kmean(img):
+    # Cover img to hsv
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    img_2d = img.reshape((-1,3))
+    kmeans = KMeans(n_clusters=2).fit(img_2d)
+    labels = kmeans.labels_
+    cluster_img = labels.reshape(img.shape[:2])
+
+    return cluster_img
+
 
 class RotNetDataGenerator(Sequence):
     """
@@ -233,7 +249,7 @@ class RotNetDataGenerator(Sequence):
 
     def __init__(self, input, input_shape=None, color_mode='rgb', batch_size=64,
                  one_hot=True, preprocess_func=None, rotate=True, crop_center=False,
-                 crop_largest_rect=False, shuffle=False, seed=None):
+                 crop_largest_rect=False, shuffle=False, seed=None, binary=True):
 
         self.images = None
         self.filenames = None
@@ -246,6 +262,8 @@ class RotNetDataGenerator(Sequence):
         self.crop_center = crop_center
         self.crop_largest_rect = crop_largest_rect
         self.shuffle = shuffle
+        self.seed = seed
+        self.binary = binary
 
         if self.color_mode not in {'rgb', 'grayscale'}:
             raise ValueError('Invalid color mode:', self.color_mode,
@@ -279,13 +297,17 @@ class RotNetDataGenerator(Sequence):
                 image = self.images[j]
             else:
                 is_color = int(self.color_mode == 'rgb')
-                image = cv2.imread(self.filenames[j], is_color)
-                if is_color:
-                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                try:
+                    image = cv2.imread(self.filenames[j], is_color)
+                    if is_color:
+                        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                except:
+                    print('Could not read image ' + self.filenames[j])
+                    continue
 
             if self.rotate:
                 # get a random angle
-                rotation_angle = np.random.randint(360)
+                rotation_angle = np.random.choice(rotations)
             else:
                 rotation_angle = 0
 
@@ -298,17 +320,20 @@ class RotNetDataGenerator(Sequence):
                 crop_largest_rect=self.crop_largest_rect
             )
 
+            if self.binary:
+                rotated_image = find_binary_img_by_kmean(rotated_image)
+
             # add dimension to account for the channels if the image is greyscale
             if rotated_image.ndim == 2:
                 rotated_image = np.expand_dims(rotated_image, axis=2)
 
             # store the image and label in their corresponding batches
             batch_x[i] = rotated_image
-            batch_y[i] = rotation_angle
+            batch_y[i] = rotations.index(rotation_angle)
 
         if self.one_hot:
             # convert the numerical labels to binary labels
-            batch_y = to_categorical(batch_y, 360)
+            batch_y = to_categorical(batch_y, num_classes=len(rotations))
         else:
             batch_y /= 360
 
@@ -366,12 +391,14 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
             image = cv2.imread(filenames[i])
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             images.append(image)
+        # Resize all images to the same size (224, 224, 3)
+        images = [cv2.resize(image, size) for image in images]
         images = np.asarray(images)
 
     x = []
     y = []
     for image in images:
-        rotation_angle = np.random.randint(360)
+        rotation_angle = np.random.choice(rotations)
         rotated_image = generate_rotated_image(
             image,
             rotation_angle,
@@ -380,7 +407,7 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
             crop_largest_rect=crop_largest_rect
         )
         x.append(rotated_image)
-        y.append(rotation_angle)
+        y.append(rotations.index(rotation_angle))
 
     x = np.asarray(x, dtype='float32')
     y = np.asarray(y, dtype='float32')
@@ -388,7 +415,7 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
     if x.ndim == 3:
         x = np.expand_dims(x, axis=3)
 
-    y = to_categorical(y, 360)
+    y = to_categorical(y, num_classes=len(rotations))
 
     x_rot = np.copy(x)
 
@@ -397,6 +424,10 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
 
     y = np.argmax(y, axis=1)
     y_pred = np.argmax(model.predict(x), axis=1)
+    print(y, y_pred)
+    y_angles = [rotations[i] for i in y]
+    y_pred_angles = [rotations[i] for i in y_pred]
+    print(y_angles, y_pred_angles)
 
     plt.figure(figsize=(10.0, 2 * num_images))
 
@@ -406,8 +437,10 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
     }
 
     fig_number = 0
-    for rotated_image, true_angle, predicted_angle in zip(x_rot, y, y_pred):
-        original_image = rotate(rotated_image, -true_angle)
+    for rotated_image, true_angle_idx, predicted_angle_idx in zip(x_rot, y, y_pred):
+        true_angle = rotations[true_angle_idx]
+        predicted_angle = rotations[predicted_angle_idx]
+        original_image = rotate(rotated_image, -(true_angle))
         if crop_largest_rect:
             original_image = crop_largest_rectangle(original_image, -true_angle, *size)
 

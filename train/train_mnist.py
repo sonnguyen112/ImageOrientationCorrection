@@ -22,8 +22,9 @@ nb_filters = 64
 pool_size = (2, 2)
 # convolution kernel size
 kernel_size = (3, 3)
+
 # number of classes
-nb_classes = 360
+nb_classes = 24
 
 nb_train_samples, img_rows, img_cols = X_train.shape
 img_channels = 1
@@ -56,7 +57,7 @@ model.compile(loss='categorical_crossentropy',
 
 # training parameters
 batch_size = 128
-nb_epoch = 100
+nb_epoch = 50
 
 output_folder = 'models'
 if not os.path.exists(output_folder):
