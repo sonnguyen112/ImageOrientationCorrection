@@ -49,7 +49,7 @@ model.compile(loss='categorical_crossentropy',
               metrics=[angle_error])
 
 # training parameters
-batch_size = 32
+batch_size = 64
 nb_epoch = 50
 
 output_folder = 'models'
