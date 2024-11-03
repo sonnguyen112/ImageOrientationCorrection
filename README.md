@@ -29,4 +29,7 @@ You can also specify the following command line arguments:
 
 
 You can aslo test with UI app by running the following command: `python app.py`
-Note: You need to put models file in `models` folder to test the app.
+
+Note: 
+- You need to put models file in `models` folder to test the app.
+- If you want to test the method lines-based, you need have a environment variable `OPENAI_API_KEY` with your OpenAI API key.
