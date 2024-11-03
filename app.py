@@ -1,87 +1,89 @@
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, ttk
 from PIL import Image, ImageTk
-import cv2
+import threading
+from methods import correct_image_by_line, correct_img_by_rotnet
 import numpy as np
-from keras.models import load_model
-import tensorflow as tf
-from utils import angle_error, RotNetDataGenerator, rotate
-from keras.applications.imagenet_utils import preprocess_input
-import keras.backend as K
-bound_angle = 15
+import cv2
+
 
 def upload_image():
-    global img_path, img
-    img_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.png *.jpeg")])
+    """
+    Upload an image from the user's file system and display it in the GUI.
+    """
+    global img_path, img, img_tk
+    img_path = filedialog.askopenfilename(
+        filetypes=[("Image files", "*.jpg *.png *.jpeg")])
     if img_path:
         img = Image.open(img_path)
-        img.thumbnail((300, 300))  # Resize for display purposes
+        img.thumbnail((300, 300))  # Resize ảnh để hiển thị
         img_tk = ImageTk.PhotoImage(img)
         original_label.config(image=img_tk)
         original_label.image = img_tk
 
 
-def combined_loss(y_true, y_pred):
-    categorical_loss = K.categorical_crossentropy(y_true, y_pred)
-    angle_loss = angle_error(y_true, y_pred)  # Assuming angle_error is defined appropriately
-    total_loss = categorical_loss + angle_loss
-    return total_loss
-
-
 def process_image():
+    """
+    Process the uploaded image using the selected algorithm and display the result in the GUI.
+    """
     if not img_path:
         return
-    
-    # Read the image and process it with OpenCV
-    predictions = model.predict_generator(
-        RotNetDataGenerator(
-            img_path,
-            input_shape=(224, 224, 3),
-            batch_size=1,
-            one_hot=True,
-            preprocess_func=preprocess_input,
-            rotate=False,
-            crop_largest_rect=True,
-            crop_center=True
-        ),
-    )
 
-    predicted_angle = np.argmax(predictions, axis=1) - bound_angle
-    image = cv2.imread(img_path)
-    rotated_image = rotate(image, -predicted_angle)
-    
-    # Convert processed image to Pillow format
-    processed_img = Image.fromarray(rotated_image)
-    processed_img.thumbnail((300, 300))  # Resize for display
+    loading_label.config(text="Loading...")
+    process_btn.config(state="disabled")
+
+    thread = threading.Thread(target=process_image_thread)
+    thread.start()
+
+
+def process_image_thread():
+    """
+    Thread that processes the image using the selected algorithm.
+    """
+    algorithm = algorithm_var.get()
+
+    if algorithm == "Line-Based Correction":
+        processed_img = correct_image_by_line(img, crop=False)
+        if processed_img is None:
+            processed_img = img
+    elif algorithm == "DeepLearning-Based Correction":
+        processed_img = correct_img_by_rotnet(img_path, crop=False)
+
+    processed_img.thumbnail((300, 300))
     processed_tk = ImageTk.PhotoImage(processed_img)
-    
     processed_label.config(image=processed_tk)
     processed_label.image = processed_tk
 
-# Initialize the main window
+    loading_label.config(text="Done!")
+    process_btn.config(state="normal")
+
+
 root = tk.Tk()
-root.title("Image Processing UI")
+root.title("Image Orientation Correction")
 root.geometry("650x400")
 
-# Initialize global variables
 img_path = None
 img = None
 
-# Set up UI components
 upload_btn = tk.Button(root, text="Upload Image", command=upload_image)
 upload_btn.pack(pady=10)
 
 process_btn = tk.Button(root, text="Process Image", command=process_image)
 process_btn.pack(pady=10)
 
-# Labels to display images
+algorithm_var = tk.StringVar(value="Line-Based Correction")
+algorithm_menu = ttk.Combobox(root, textvariable=algorithm_var, values=[
+                              "Line-Based Correction", "DeepLearning-Based Correction"], state="readonly", width=30)
+algorithm_menu.pack(pady=10)
+
 original_label = tk.Label(root)
 original_label.pack(side="left", padx=10)
 
 processed_label = tk.Label(root)
 processed_label.pack(side="right", padx=10)
 
-if __name__ == "__main__":
-    model_path = r'models\rotnet_indoor_resnet50.keras'
-    model = load_model(model_path, custom_objects={'angle_error': angle_error, 'combined_loss': combined_loss})
-    root.mainloop()
+loading_label = tk.Label(root, text="")
+loading_label.pack(pady=10)
+
+root.mainloop()
+

@@ -5,15 +5,17 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
+import os
 
 
 # from keras.preprocessing.image import Iterator
 from keras.utils import Sequence
-from keras.utils import to_categorical 
+from keras.utils import to_categorical
 # import keras.backend as K
 import tensorflow as tf
 
 rotations = [i * -5 for i in range(1, 13)] + [i * 5 for i in range(1, 13)]
+
 
 def angle_difference(x, y):
     """
@@ -31,7 +33,7 @@ def angle_error(y_true, y_pred):
     rotations_tf = tf.constant(rotations)
     y_true_idx = tf.argmax(y_true)
     y_pred_idx = tf.argmax(y_pred)
-    diff = angle_difference(tf.gather(rotations_tf, y_true_idx), 
+    diff = angle_difference(tf.gather(rotations_tf, y_true_idx),
                             tf.gather(rotations_tf, y_pred_idx))
     return tf.reduce_mean(tf.cast(tf.abs(diff), tf.float32))
 
@@ -83,9 +85,9 @@ def rotate(image, angle):
     # Obtain the rotated coordinates of the image corners
     rotated_coords = [
         (np.array([-image_w2,  image_h2]) * rot_mat_notranslate).A[0],
-        (np.array([ image_w2,  image_h2]) * rot_mat_notranslate).A[0],
+        (np.array([image_w2,  image_h2]) * rot_mat_notranslate).A[0],
         (np.array([-image_w2, -image_h2]) * rot_mat_notranslate).A[0],
-        (np.array([ image_w2, -image_h2]) * rot_mat_notranslate).A[0]
+        (np.array([image_w2, -image_h2]) * rot_mat_notranslate).A[0]
     ]
 
     # Find the size of the new image
@@ -175,10 +177,10 @@ def crop_around_center(image, width, height):
     image_size = (image.shape[1], image.shape[0])
     image_center = (int(image_size[0] * 0.5), int(image_size[1] * 0.5))
 
-    if(width > image_size[0]):
+    if (width > image_size[0]):
         width = image_size[0]
 
-    if(height > image_size[1]):
+    if (height > image_size[1]):
         height = image_size[1]
 
     x1 = int(image_center[0] - width * 0.5)
@@ -230,10 +232,11 @@ def generate_rotated_image(image, angle, size=None, crop_center=False,
 
     return image
 
+
 def find_binary_img_by_kmean(img):
     # Cover img to hsv
     img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    img_2d = img.reshape((-1,3))
+    img_2d = img.reshape((-1, 3))
     kmeans = KMeans(n_clusters=2).fit(img_2d)
     labels = kmeans.labels_
     cluster_img = labels.reshape(img.shape[:2])
@@ -241,7 +244,23 @@ def find_binary_img_by_kmean(img):
     return cluster_img
 
 
-class RotNetDataGenerator(Sequence):
+def get_filenames(path):
+    image_paths = []
+    for filename in os.listdir(path):
+        # view_id = filename.split('_')[1].split('.')[0]
+        # # ignore images with markers (0) and upward views (5)
+        # if not(view_id == '0' or view_id == '5'):
+        image_paths.append(os.path.join(path, filename))
+
+    # 90% train images and 10% test images
+    n_train_samples = int(len(image_paths) * 0.9)
+    train_filenames = image_paths[:n_train_samples]
+    test_filenames = image_paths[n_train_samples:]
+
+    return train_filenames, test_filenames
+
+
+class DataGenerator(Sequence):
     """
     Given a NumPy array of images or a list of image paths,
     generate batches of rotated images and rotation angles on-the-fly.
@@ -287,7 +306,8 @@ class RotNetDataGenerator(Sequence):
 
     def _get_batches_of_transformed_samples(self, index_array):
         # create array to hold the images
-        batch_x = np.zeros((len(index_array),) + self.input_shape, dtype='float32')
+        batch_x = np.zeros((len(index_array),) +
+                           self.input_shape, dtype='float32')
         # create array to hold the labels
         batch_y = np.zeros(len(index_array), dtype='float32')
 
@@ -309,7 +329,7 @@ class RotNetDataGenerator(Sequence):
                 # get a random angle
                 rotation_angle = np.random.choice(rotations)
             else:
-                rotation_angle = 5
+                rotation_angle = 0
 
             # generate the rotated image
             rotated_image = generate_rotated_image(
@@ -329,8 +349,11 @@ class RotNetDataGenerator(Sequence):
 
             # store the image and label in their corresponding batches
             batch_x[i] = rotated_image
-            
-            batch_y[i] = rotations.index(rotation_angle)
+
+            if rotation_angle == 0:
+                batch_y[i] = 0
+            else:
+                batch_y[i] = rotations.index(rotation_angle)
 
         if self.one_hot:
             # convert the numerical labels to binary labels
@@ -352,8 +375,10 @@ class RotNetDataGenerator(Sequence):
     #     return self._get_batches_of_transformed_samples(index_array)
     def __getitem__(self, index):
         # generates one batch of data
-        batch_indexes = self.indexes[index * self.batch_size:(index + 1) * self.batch_size]
-        batch_x, batch_y = self._get_batches_of_transformed_samples(batch_indexes)
+        batch_indexes = self.indexes[index *
+                                     self.batch_size:(index + 1) * self.batch_size]
+        batch_x, batch_y = self._get_batches_of_transformed_samples(
+            batch_indexes)
         return batch_x, batch_y
 
     def __len__(self):
@@ -443,11 +468,13 @@ def display_examples(model, input, num_images=5, size=None, crop_center=False,
         predicted_angle = rotations[predicted_angle_idx]
         original_image = rotate(rotated_image, -(true_angle))
         if crop_largest_rect:
-            original_image = crop_largest_rectangle(original_image, -true_angle, *size)
+            original_image = crop_largest_rectangle(
+                original_image, -true_angle, *size)
 
         corrected_image = rotate(rotated_image, -predicted_angle)
         if crop_largest_rect:
-            corrected_image = crop_largest_rectangle(corrected_image, -predicted_angle, *size)
+            corrected_image = crop_largest_rectangle(
+                corrected_image, -predicted_angle, *size)
 
         if x.shape[3] == 1:
             options = {'cmap': 'gray'}

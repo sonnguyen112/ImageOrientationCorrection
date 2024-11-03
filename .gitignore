@@ -174,16 +174,7 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
-mit_dataset
-street_view
-SUNRGBD
-*.zip
-models
-rotnet_models
-mit_indoor
-indoor_dataset
-mit_dataset_rotation
 logs
 runs
-scr
 *.pt
+*.keras

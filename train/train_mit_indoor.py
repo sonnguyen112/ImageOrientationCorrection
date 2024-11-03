@@ -12,8 +12,8 @@ from keras.optimizers import SGD, Adam
 import keras.backend as K
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import angle_error, RotNetDataGenerator
-from data.street_view import get_filenames as get_street_view_filenames
+from utils import angle_error, DataGenerator
+from utils import get_filenames as get_street_view_filenames
 
 
 data_path = os.path.join('data', r'mit_dataset')
@@ -22,7 +22,7 @@ train_filenames, test_filenames = get_street_view_filenames(data_path)
 print(len(train_filenames), 'train samples')
 print(len(test_filenames), 'test samples')
 
-model_name = 'rotnet_indoor_resnet50'
+model_name = 'rotnet_indoor_resnet50_2'
 
 # number of classes
 nb_classes = 24
@@ -43,20 +43,10 @@ model = Model(inputs=base_model.input, outputs=final_output)
 
 model.summary()
 
-def combined_loss(y_true, y_pred):
-    categorical_loss = K.categorical_crossentropy(y_true, y_pred)
-    angle_loss = angle_error(y_true, y_pred)  # Assuming angle_error is defined appropriately
-    total_loss = categorical_loss + angle_loss
-    return total_loss
-
 # model compilation
 model.compile(loss='categorical_crossentropy',
               optimizer=SGD(learning_rate=0.01, momentum=0.9),
               metrics=[angle_error])
-
-# model.compile(loss=combined_loss,
-#               optimizer=SGD(learning_rate=0.01, momentum=0.9),
-#               metrics=[angle_error])
 
 # training parameters
 batch_size = 32
@@ -79,23 +69,25 @@ tensorboard = TensorBoard()
 
 # training loop
 model.fit(
-    RotNetDataGenerator(
+    DataGenerator(
         train_filenames,
         input_shape=input_shape,
         batch_size=batch_size,
 
-        preprocess_func=None,
+        preprocess_func=preprocess_input,
+        binary=False,
         crop_center=True,
         crop_largest_rect=True,
         shuffle=True
     ),
     steps_per_epoch=len(train_filenames) // batch_size,
     epochs=nb_epoch,
-    validation_data=RotNetDataGenerator(
+    validation_data=DataGenerator(
         test_filenames,
         input_shape=input_shape,
         batch_size=batch_size,
-        preprocess_func=None,
+        preprocess_func=preprocess_input,
+        binary=False,
         crop_center=True,
         crop_largest_rect=True
     ),

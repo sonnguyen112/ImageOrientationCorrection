@@ -8,10 +8,7 @@ import argparse
 from keras.applications.imagenet_utils import preprocess_input
 from keras.models import load_model
 
-from utils import RotNetDataGenerator, crop_largest_rectangle, angle_error, rotate
-
-bound_angle = 15
-
+from utils import DataGenerator, crop_largest_rectangle, angle_error, rotate, rotations
 
 def process_images(model, input_path, output_path,
                    batch_size=64, crop=True):
@@ -32,19 +29,20 @@ def process_images(model, input_path, output_path,
             print('Output must be a directory!')
 
     predictions = model.predict_generator(
-        RotNetDataGenerator(
+        DataGenerator(
             image_paths,
             input_shape=(224, 224, 3),
             batch_size=1,
             one_hot=True,
-            preprocess_func=preprocess_input,
+            preprocess_func=None,
             rotate=False,
             crop_largest_rect=True,
             crop_center=True
         ),
     )
 
-    predicted_angles = np.argmax(predictions, axis=1) - bound_angle
+    predicted_angles = [rotations[int(np.argmax(predictions, axis=1))]]
+    print('Predicted angles:', predicted_angles)
 
     if output_path == '':
         output_path = '.'
