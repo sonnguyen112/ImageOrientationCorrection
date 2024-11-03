@@ -13,7 +13,7 @@ Download [here](https://www.kaggle.com/datasets/itsahmad/indoor-scenes-cvpr-2019
 
 `python train/train_mit_indoor.py` to train on the MIT Indoor Scene dataset.
 
-If you only want to test the models, you can download pre-trained versions [here](https://drive.google.com/file/d/0B9eNEi5uvOI1SjQ5M2tQY3ZMM1U/view?usp=sharing&resourcekey=0-fxeNvoCZNlUrpQkzqZmDzw).
+If you only want to test the models, you can download pre-trained versions [here](https://drive.google.com/file/d/1zPgxnKAlgAx98MvJ0GJuY_bGFAqSr2Ir/view?usp=sharing).
 
 ## Test
 You can evaluate the models and display examples using the provided Jupyter notebooks. Simply run `jupyter notebook` from the root directory and navigate to `test/test_mit_indoor.ipynb`.
