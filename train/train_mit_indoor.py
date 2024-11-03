@@ -4,7 +4,7 @@ import os
 import sys
 
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
-from tensorflow.keras.applications import ResNet50, EfficientNetB3
+from tensorflow.keras.applications import ResNet50
 from keras.applications.imagenet_utils import preprocess_input
 from keras.models import Model
 from keras.layers import Dense, Flatten
